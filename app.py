@@ -100,7 +100,8 @@ def classify(js):
     no_test = test.dropna(subset=['Predicted'])
     res = model.predict(clear_test['Описание'])
     clear_test.loc[:, 'Predicted'] = res
-    return clear_test.to_json(orient='records', force_ascii=False)
+    full = pd.concat((clear_test, no_test))
+    return full.to_json(orient='records', force_ascii=False)
 
 
 @app.route('/clf', methods=['POST'])
