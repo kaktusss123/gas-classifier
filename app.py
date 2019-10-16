@@ -108,4 +108,4 @@ def clf():
     js = request.json
     return classify(js['data'])
 
-app.run()
+app.run('10.199.13.111', 9512)
