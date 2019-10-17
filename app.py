@@ -25,10 +25,13 @@ def prepare(train):
     return model
 
 
-def clear(row):
+def clear(row, exception=''):
     try:
         row.at['Full description'] = row.at['Описание']
         descr = row['Описание']  # ' '.join(results)
+        if exception and search(exception, descr, re.IGNORECASE):
+            row.at['Predicted'] = 'нет данных'
+            return row
         regex = r'(^|\s|,|\(|\\)газ(?!он|пром|пено|бетон| баллон|ет|овик)'
         sentences = split(r'[.?!;]', row.at['Описание'])
         results = []
@@ -75,30 +78,31 @@ def clear(row):
 
 
 def start():
-    df = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
+    gas = pd.read_excel('gas.xlsx', sheet_name='газоснабжение', usecols=[
                        'Описание', 'Газоснабжение из описания', 'Газоснабжение финал'])
-    df['Full description'] = [None] * len(df)
-    df = df.apply(clear, axis=1)
-    train = df
-    test = pd.read_excel('test.xlsx', sheet_name='Лист1', usecols=[
-                         'Уникальный идентификационный номер Ч', 'Описание'])
-    test['Predicted'] = [None] * len(test)
-    test['Full description'] = [None] * len(test)
-    test = test.apply(clear, axis=1)
-    return prepare(train)
+    gas['Full description'] = [None] * len(gas)
+    gas = gas.apply(clear, axis=1)
+    return prepare(gas)
 
 
-model = start()
+gas = start()
 
 
-def classify(js):
-    test = pd.read_json(json.dumps(js), orient='records')
+def classify(type_, data, exception):
+    global gas
+    if type_ == 'газ':
+        model = gas
+    # Paste new models here and into start() func
+    test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = [None] * len(test)
     test['Predicted'] = [None] * len(test)
-    test = test.apply(clear, axis=1)
+    test = test.apply(clear, axis=1, args=(exception,))
     clear_test = test.loc[test.Predicted.isnull()]
     no_test = test.dropna(subset=['Predicted'])
-    res = model.predict(clear_test['Описание'])
+    try:
+        res = model.predict(clear_test['Описание'])
+    except ValueError:
+        res = clear_test['Описание']
     clear_test.loc[:, 'Predicted'] = res
     full = pd.concat((clear_test, no_test))
     return full.to_json(orient='records', force_ascii=False)
@@ -107,6 +111,6 @@ def classify(js):
 @app.route('/clf', methods=['POST'])
 def clf():
     js = request.json
-    return classify(js['data'])
+    return classify(js['type'], js['data'], js['exception'])
 
 app.run('10.199.13.111', 9512)
