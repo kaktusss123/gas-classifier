@@ -32,7 +32,7 @@ def clear(row, exception=''):
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['Predicted'] = 'нет данных'
             return row
-        regex = r'(^|\s|,|\(|\\)газ(?!он|пром|пено|бетон| баллон|ет|овик)'
+        regex = r'(^|\s|,|\(|\\)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
         sentences = split(r'[.?!;]', row.at['Описание'])
         results = []
         found = False
