@@ -99,9 +99,9 @@ def classify(type_, data, exception):
     test = test.apply(clear, axis=1, args=(exception,))
     clear_test = test.loc[test.Predicted.isnull()]
     no_test = test.dropna(subset=['Predicted'])
-    try:
+    if not clear_test.empty:
         res = model.predict(clear_test['Описание'])
-    except ValueError:
+    else:
         res = clear_test['Описание']
     clear_test.loc[:, 'Predicted'] = res
     full = pd.concat((clear_test, no_test))
