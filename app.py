@@ -11,7 +11,7 @@ from flask import Flask, request
 app = Flask(__name__)
 
 def fit_model(clf, train, **params):
-    texts = train['Описание']
+    texts = train['text']
     texts_labels = train['Газоснабжение финал']
     model = Pipeline(
         [('tfidf', TfidfVectorizer(ngram_range=(1, 3))), ('clf', clf(**params))])
@@ -27,13 +27,12 @@ def prepare(train):
 
 def clear(row, exception=''):
     try:
-        row.at['Full description'] = row.at['Описание']
-        descr = row['Описание']  # ' '.join(results)
+        descr = row['Full description']  # ' '.join(results)
         if exception and search(exception, descr, re.IGNORECASE):
-            row.at['Predicted'] = 'нет данных'
+            row.at['predicted'] = 'нет данных'
             return row
         regex = r'(^|\s|,|\(|\\)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
-        sentences = split(r'[.?!;]', row.at['Описание'])
+        sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
         for s in sentences:
@@ -46,7 +45,7 @@ def clear(row, exception=''):
         # if search(regex, descr, re.IGNORECASE) or search(r'(^|\s|,|\()коммуник', descr, re.IGNORECASE):
         #     found = True
         if not results:
-            row.at['Predicted'] = 'нет данных'
+            row.at['predicted'] = 'нет данных'
             return row
         else:
             descr = ' '.join(results)
@@ -58,29 +57,28 @@ def clear(row, exception=''):
                         start = max(i - 20, 0)
                         end = min(i + 21, len(splitted))
                         new_descr = ' '.join(splitted[start: end])
-                        break
-                else:
-                    for i, e in enumerate(splitted):
-                        if search(r'(^|\s|,|\()коммуник', e, re.IGNORECASE):
-                            start = max(i - 20, 0)
-                            end = min(i + 21, len(splitted))
-                            new_descr = ' '.join(splitted[start: end])
-                            break
-            if new_descr:
-                row.at['Описание'] = new_descr
-            else:
-                row.at['Описание'] = descr
+                        row.at['text'] = new_descr
+                        return row
+                for i, e in enumerate(splitted):
+                    if search(r'(^|\s|,|\()коммуник', e, re.IGNORECASE):
+                        start = max(i - 20, 0)
+                        end = min(i + 21, len(splitted))
+                        new_descr = ' '.join(splitted[start: end])
+                        row.at['text'] = new_descr
+                        return row
+        
+            row.at['text'] = descr
     except Exception as e:
         print(f'{e.__class__.__name__}: {e}')
-    finally:
-        row.at['Описание'] = str(row.at['Описание'])
-        return row
+    row.at['text'] = str(row.at['text'])
+    return row
 
 
 def start():
     gas = pd.read_excel('gas.xlsx', sheet_name='газоснабжение', usecols=[
                        'Описание', 'Газоснабжение из описания', 'Газоснабжение финал'])
-    gas['Full description'] = [None] * len(gas)
+    gas = gas.rename(columns={'Описание': 'text'})
+    gas['Full description'] = gas['text']
     gas = gas.apply(clear, axis=1)
     return prepare(gas)
 
@@ -94,18 +92,18 @@ def classify(type_, data, exception):
         model = gas
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
-    test['Full description'] = [None] * len(test)
-    test['Predicted'] = [None] * len(test)
+    test['Full description'] = test['text']
+    test['predicted'] = [None] * len(test)
     test = test.apply(clear, axis=1, args=(exception,))
-    clear_test = test.loc[test.Predicted.isnull()]
-    no_test = test.dropna(subset=['Predicted'])
+    clear_test = test.loc[test.predicted.isnull()]
+    no_test = test.dropna(subset=['predicted'])
     if not clear_test.empty:
-        res = model.predict(clear_test['Описание'])
+        res = model.predict(clear_test['text'])
     else:
-        res = clear_test['Описание']
-    clear_test.loc[:, 'Predicted'] = res
+        res = clear_test['text']
+    clear_test.loc[:, 'predicted'] = res
     full = pd.concat((clear_test, no_test))
-    return full.to_json(orient='records', force_ascii=False)
+    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
 
 
 @app.route('/clf', methods=['POST'])
