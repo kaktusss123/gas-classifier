@@ -3,18 +3,19 @@
 <details> 
   <summary>Описание алгоритма </summary>
 
-При запуске сервиса происходит векторизация данных и обучение модели с использованием данных из файла `gas.xlsx`.
+При запуске сервиса происходит векторизация данных и обучение модели с использованием данных из файла `input.xlsx`.
+[Источник](http://zabaykin.ru/?p=558)
 
 TODO:  
 - [ ] Добавить воду  
-- [ ] Добавить свет  
+- [x] Добавить свет  
 
 
 Параметры модели: 
 
-- Vectorizer: TfIdf  
-- Classifier: SGDClassifier  
-- Loss function: hinge  
+- Vectorizer: [TfIdf](https://scikit-learn.org/0.21/modules/generated/sklearn.feature_extraction.text.TfidfVectorizer.html)
+- Classifier: [SGDClassifier](https://scikit-learn.org/0.20/modules/generated/sklearn.linear_model.SGDClassifier.html)  
+- Loss function: [hinge](https://en.wikipedia.org/wiki/Hinge_loss)  
 - Regularizator: None  
 - Learning rate: constant (eta = eta0)  
 - eta0: 0.5  
