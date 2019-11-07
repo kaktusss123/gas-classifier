@@ -8,7 +8,8 @@ import json
 from flask import Flask, request
 import logging as log
 
-log.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = log.DEBUG)
+log.basicConfig(
+    format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level=log.DEBUG)
 
 
 app = Flask(__name__)
@@ -44,6 +45,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'свет':
             regex = r'(^|\s|\W)(электрич|свет)(?!к)'
             communications = r'(^|\s|\W)коммуник'
+        elif type_ == 'лес':
+            regex = r'(^|\s|\W|при)(лес|сосн[ыа])'
+            communications = r'(^|\s|\W)хвойн'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -91,7 +95,8 @@ def start():
     gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
         'Описание', 'Газоснабжение финал'])
     log.debug('Gas loaded')
-    gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
+    gas = gas.rename(columns={'Описание': 'text',
+                              'Газоснабжение финал': 'final'})
     gas['Full description'] = gas['text']
     gas = gas.apply(clear, axis=1, args=('газ',))
     log.debug('Preparing gas...')
@@ -105,24 +110,38 @@ def start():
     log.debug('Preparing electricity...')
     electro = prepare(electro)
     log.debug('Electricity prepared')
-    return gas, electro
+    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=[
+                           'Описание', 'Лес из описания финал'])
+    log.debug('Forest loaded')
+    forest = forest.rename(
+        columns={'Описание': 'text', 'Лес из описания финал': 'final'})
+    forest['Full description'] = forest['text']
+    forest = forest.apply(clear, axis=1, args=('лес',))
+    log.debug('Preparing forest...')
+    forest = prepare(forest)
+    log.debug('Forest prepared')
+    return gas, electro, forest
 
 
-gas, electro = start()
+gas, electro, forest = start()
 
 
-def classify(type_, data, exception):
-    log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
-    global gas, electro
+def classify(type_, data, exception=''):
+    log.debug(
+        f'Classifying type: {type_}, exception: {exception}, data: {data}')
+    global gas, electro, forest
     if type_ == 'газ':
         log.debug('Selected model `газ`')
         model = gas
     elif type_ == 'свет':
         log.debug('Selected model `свет`')
         model = electro
+    elif type_ == 'лес':
+        log.debug('Selected model `лес`')
+        model = forest
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
-    test['Full description'] = test['text']
+    # test['Full description'] = test['text']  # No need, implemented in start()
     test['predicted'] = [None] * len(test)
     log.debug('Clearing texts')
     test = test.apply(clear, axis=1, args=(type_, exception))
@@ -135,7 +154,7 @@ def classify(type_, data, exception):
         res = clear_test['text']
     clear_test.loc[:, 'predicted'] = res
     full = pd.concat((clear_test, no_test))
-    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
+    return full[['id', 'text', 'predicted', 'final']].to_json(orient='records', force_ascii=False)
 
 
 @app.route('/clf', methods=['POST'])
@@ -145,4 +164,4 @@ def clf():
 
 
 log.debug('Flask app starts')
-app.run('10.199.13.111', 9512)
+app.run()
