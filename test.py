@@ -1,94 +1,199 @@
-# -*-coding: utf-8-*-
-import re
+from sklearn.linear_model import SGDClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
 from re import split, search
+import re
 import pandas as pd
+import json
+from flask import Flask, request
+import logging as log
 
-# def clear(row):
-#     try:
-#         row.at['Full description'] = row.at['Описание']
-#         regex = r'(^|\s|,)газ'
-#         sentences = split(r'[.?!]', row.at['Описание'])
-#         results = []
-#         for s in sentences:
-#             if search(regex, s, flags=re.IGNORECASE):
-#                 results.append(s)
-#         if not results:
-#             for s in sentences:
-#                 if search(r'(^|\s|,)газкоммуник', s, flags=re.IGNORECASE):
-#                     results.append(s)
-#         if not results:
-#             row.at['Predicted'] = 'нет'
-#             return row
-#         else:
-#             descr = ' '.join(results)
-#             splitted = list(filter(lambda x: x, split(r'[!?., ]', descr)))
-#             new_descr = ''
-#             if len(splitted) > 10:
-#                 for i, e in enumerate(splitted):
-#                     if search(regex, e, re.IGNORECASE):
-#                         start = max(i - 10, 0)
-#                         end = min(i + 11, len(splitted))
-#                         new_descr = ' '.join(splitted[start: end])
-#                         break
-#             if new_descr:
-#                 row.at['Описание'] = new_descr
-#             else:
-#                 row.at['Описание'] = descr
-#     except Exception as e:
-#         print(f'{e.__class__.__name__}: {e}')
-#     finally:
-#         row.at['Описание'] = str(row.at['Описание'])
-#         return row
+log.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = log.DEBUG)
 
 
-def clear(row):
+# app = Flask(__name__)
+log.debug('Flask app created')
+
+
+def fit_model(clf, train, **params):
+    texts = train['text']
+    texts_labels = train['final']
+    model = Pipeline(
+        [('tfidf', TfidfVectorizer(ngram_range=(1, 3))), ('clf', clf(**params))])
+    model.fit(texts, texts_labels)
+    return model
+
+
+def prepare(train):
+    model = fit_model(SGDClassifier, train, **
+                      {'loss': 'hinge', 'penalty': 'none', 'learning_rate': 'constant', 'eta0': 0.5})
+    return model
+
+
+def clear(row, type_, exception=''):
     try:
-        row.at['Full description'] = row.at['Описание']
-        regex = r'(^|\s|,)газ'
-        sentences = split(r'[.?!]', row.at['Описание'])
+        regex = ''
+        communications = ''
+        descr = row['Full description'].replace('ё', 'е')  # ' '.join(results)
+        if exception and search(exception, descr, re.IGNORECASE):
+            row.at['predicted'] = 'нет данных'
+            return row
+        if type_ == 'газ':
+            regex = r'(^|\s|\W)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
+            communications = r'(^|\s|\W)коммуник'
+        elif type_ == 'свет':
+            regex = r'(^|\s|\W)(электрич|свет)(?!к)'
+            communications = r'(^|\s|\W)коммуник'
+        elif type_ == 'лес':
+            regex = r'(^|\s|\W|при)(лес|сосн[ыа])'
+            communications = r'(^|\s|\W)хвойн'
+        elif type_ == 'водрес':
+            regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
+            communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
+        sentences = split(r'[.?!;]', row.at['text'])
         results = []
+        found = False
         for s in sentences:
             if search(regex, s, flags=re.IGNORECASE):
                 results.append(s)
         if not results:
             for s in sentences:
-                if search(r'(^|\s|,)коммуник', s, flags=re.IGNORECASE):
+                if search(communications, s, flags=re.IGNORECASE):
                     results.append(s)
+        # if search(regex, descr, re.IGNORECASE) or search(r'(^|\s|,|\()коммуник', descr, re.IGNORECASE):
+        #     found = True
         if not results:
-            row.at['Predicted'] = 'нет'
+            row.at['predicted'] = 'нет данных'
             return row
         else:
-            descr = row['Описание']  # ' '.join(results)
-            splitted = list(filter(lambda x: x, split(r'[!?., ]', descr)))
+            descr = ' '.join(results)
+            splitted = list(filter(lambda x: x, split(r'([:!?., ])', descr)))
             new_descr = ''
-            if len(splitted) > 10:
+            if len(splitted) > 20:
                 for i, e in enumerate(splitted):
                     if search(regex, e, re.IGNORECASE):
-                        start = max(i - 10, 0)
-                        end = min(i + 11, len(splitted))
+                        start = max(i - 20, 0)
+                        end = min(i + 21, len(splitted))
                         new_descr = ' '.join(splitted[start: end])
-                        break
-                else:
-                    for i, e in enumerate(splitted):
-                        if search(r'(^|\s|,)коммуник', e, re.IGNORECASE):
-                            start = max(i - 10, 0)
-                            end = min(i + 11, len(splitted))
-                            new_descr = ' '.join(splitted[start: end])
-                            break
-            if new_descr:
-                row.at['Описание'] = new_descr
-            else:
-                row.at['Описание'] = descr
+                        row.at['text'] = new_descr
+                        return row
+                for i, e in enumerate(splitted):
+                    if search(communications, e, re.IGNORECASE):
+                        start = max(i - 20, 0)
+                        end = min(i + 21, len(splitted))
+                        new_descr = ' '.join(splitted[start: end])
+                        row.at['text'] = new_descr
+                        return row
+
+            row.at['text'] = descr
     except Exception as e:
         print(f'{e.__class__.__name__}: {e}')
-    finally:
-        row.at['Описание'] = str(row.at['Описание'])
-        return row
-        
-# df = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=['Описание', 'Газоснабжение из описания', 'Газоснабжение финал'])
-# x = df.iloc[0]
-x = pd.Series()
-x.at['Predicted'] = None
-x.at['Full description'] = None
-x.at['Описание'] = 'Продается земельный участок 15 соток ИЖС под строительство дома, расположенный по адресу: Московская область, г.Подольск, ул.Родниковая. Кадастровый номер:50:31:0040803:47. Участок расположен на землях населенных пунктов. Использование земельного участка не ограниченно обременением, природоохранными, санитарными, технологическимии иными зонами. Участок прямоугольной формы со всеми коммуникациями. В 150 м протекает река Лопасня, рядом церковь, в 500 м находится лицей 4, магазины, банк, автобусная отсановка.'
-print(clear(x))
+    row.at['text'] = str(row.at['text'])
+    return row
+
+
+def start():
+    log.debug('Pre-start')
+    gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
+        'Описание', 'Газоснабжение финал'])
+    log.debug('Gas loaded')
+    gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
+    gas['Full description'] = gas['text']
+    gas = gas.apply(clear, axis=1, args=('газ',))
+    log.debug('Preparing gas...')
+    gas = prepare(gas)
+    log.debug('Gas prepared')
+    electro = pd.read_excel('input.xlsx', sheet_name='электричество', usecols=[
+        'Описание', 'Электричество финал']).rename(columns={'Описание': 'text', 'Электричество финал': 'final'})
+    log.debug('Electricity loaded')
+    electro['Full description'] = electro['text']
+    electro = electro.apply(clear, axis=1, args=('свет',))
+    log.debug('Preparing electricity...')
+    electro = prepare(electro)
+    log.debug('Electricity prepared')
+    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=['Описание', 'Лес из описания финал'])
+    log.debug('Forest loaded')
+    forest = forest.rename(columns={'Описание': 'text', 'Лес из описания финал': 'final'})
+    forest['Full description'] = forest['text']
+    forest = forest.apply(clear, axis=1, args=('лес',))
+    log.debug('Preparing forest...')
+    forest = prepare(forest)
+    log.debug('Forest prepared')
+
+    river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
+    ###
+    river = river.iloc[:int(0.8 * len(river))]
+    ###
+    log.debug('River loaded')
+    river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
+    river['Full description'] = river['text']
+    river = river.apply(clear, axis=1, args=('лес',))
+    log.debug('Preparing river...')
+    river = prepare(river)
+    log.debug('River prepared')
+    return gas, electro, forest, river
+
+
+gas, electro, forest, river = start()
+
+
+def classify(type_, data, exception=''):
+    log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
+    global gas, electro, forest
+    if type_ == 'газ':
+        log.debug('Selected model `газ`')
+        model = gas
+    elif type_ == 'свет':
+        log.debug('Selected model `свет`')
+        model = electro
+    elif type_ == 'лес':
+        log.debug('Selected model `лес`')
+        model = forest
+    elif type_ == 'водрес':
+        log.debug('Selected model `водные ресурсы`')
+        model = river
+    # Paste new models here and into start() func
+    test = pd.read_json(json.dumps(data), orient='records')
+    # test['Full description'] = test['text']  # No need, implemented in start()
+    test['predicted'] = [None] * len(test)
+    log.debug('Clearing texts')
+    test = test.apply(clear, axis=1, args=(type_, exception))
+    clear_test = test.loc[test.predicted.isnull()]
+    no_test = test.dropna(subset=['predicted'])
+    if not clear_test.empty:
+        res = model.predict(clear_test['text'])
+    else:
+        log.error('No valuable records')
+        res = clear_test['text']
+    clear_test.loc[:, 'predicted'] = res
+    full = pd.concat((clear_test, no_test))
+    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
+
+
+# @app.route('/clf', methods=['POST'])
+# def clf():
+#     js = request.json
+#     return classify(js['type'], js['data'], js['exception'])
+
+
+def test_model():
+    log.debug('Reding test')
+    test_forest = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
+    test_forest = test_forest.iloc[int(0.2 * len(test_forest)):]
+    test_forest = test_forest.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
+    test_forest['Full description'] = test_forest['text']
+    from random import randint
+    log.debug('Generating random id\'s')
+    test_forest['id'] = [randint(0, 1000000000) for _ in range(len(test_forest))]
+    data = {"type": "водрес", "data": test_forest.to_dict(orient='records')}
+    log.debug('Testing...')
+    result = classify(data['type'], data['data'])
+    log.debug('Writing...')
+    result = pd.read_json(result, orient='records')
+    result.to_excel('forest_result.xlsx')
+
+
+
+log.debug('Flask app starts')
+# app.run()
+test_model()

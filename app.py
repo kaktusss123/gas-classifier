@@ -35,7 +35,7 @@ def clear(row, type_, exception=''):
     try:
         regex = ''
         communications = ''
-        descr = row['Full description']  # ' '.join(results)
+        descr = row['Full description'].replace('ё', 'е')  # ' '.join(results)
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
@@ -48,6 +48,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'лес':
             regex = r'(^|\s|\W|при)(лес|сосн[ыа])'
             communications = r'(^|\s|\W)хвойн'
+        elif type_ == 'водрес':
+            regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
+            communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -95,8 +98,7 @@ def start():
     gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
         'Описание', 'Газоснабжение финал'])
     log.debug('Gas loaded')
-    gas = gas.rename(columns={'Описание': 'text',
-                              'Газоснабжение финал': 'final'})
+    gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
     gas['Full description'] = gas['text']
     gas = gas.apply(clear, axis=1, args=('газ',))
     log.debug('Preparing gas...')
@@ -110,25 +112,30 @@ def start():
     log.debug('Preparing electricity...')
     electro = prepare(electro)
     log.debug('Electricity prepared')
-    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=[
-                           'Описание', 'Лес из описания финал'])
+    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=['Описание', 'Лес из описания финал'])
     log.debug('Forest loaded')
-    forest = forest.rename(
-        columns={'Описание': 'text', 'Лес из описания финал': 'final'})
+    forest = forest.rename(columns={'Описание': 'text', 'Лес из описания финал': 'final'})
     forest['Full description'] = forest['text']
     forest = forest.apply(clear, axis=1, args=('лес',))
     log.debug('Preparing forest...')
     forest = prepare(forest)
     log.debug('Forest prepared')
-    return gas, electro, forest
+    river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
+    log.debug('River loaded')
+    river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
+    river['Full description'] = river['text']
+    river = river.apply(clear, axis=1, args=('лес',))
+    log.debug('Preparing river...')
+    river = prepare(river)
+    log.debug('River prepared')
+    return gas, electro, forest, river
 
 
-gas, electro, forest = start()
+gas, electro, forest, river = start()
 
 
 def classify(type_, data, exception=''):
-    log.debug(
-        f'Classifying type: {type_}, exception: {exception}, data: {data}')
+    log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
     global gas, electro, forest
     if type_ == 'газ':
         log.debug('Selected model `газ`')
@@ -139,6 +146,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'лес':
         log.debug('Selected model `лес`')
         model = forest
+    elif type_ == 'водрес':
+        log.debug('Selected model `водные ресурсы`')
+        model = river
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     # test['Full description'] = test['text']  # No need, implemented in start()
@@ -154,7 +164,7 @@ def classify(type_, data, exception=''):
         res = clear_test['text']
     clear_test.loc[:, 'predicted'] = res
     full = pd.concat((clear_test, no_test))
-    return full[['id', 'text', 'predicted', 'final']].to_json(orient='records', force_ascii=False)
+    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
 
 
 @app.route('/clf', methods=['POST'])
