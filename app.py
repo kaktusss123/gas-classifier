@@ -58,7 +58,7 @@ def clear(row, type_, exception=''):
             communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
-            communications = r'(^|\s|\W|\d)рыаапимваыепымыиерпипыавпр'
+            communications = r'(^|\s|\W|\d)границы'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
