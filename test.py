@@ -50,6 +50,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'водрес':
             regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
             communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
+        elif type_ == 'вода':
+            regex = r'(^|\s|\W)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
+            communications = r'(^|\s|\W)(вод[аы]|коммуник)'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -121,20 +124,29 @@ def start():
     log.debug('Forest prepared')
 
     river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
-    ###
-    river = river.iloc[:int(0.8 * len(river))]
-    ###
     log.debug('River loaded')
     river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
     river['Full description'] = river['text']
-    river = river.apply(clear, axis=1, args=('лес',))
+    river = river.apply(clear, axis=1, args=('водрес',))
     log.debug('Preparing river...')
     river = prepare(river)
     log.debug('River prepared')
-    return gas, electro, forest, river
+
+    plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
+    ###
+    plumbing = plumbing.iloc[:int(0.8 * len(plumbing))]
+    ###
+    log.debug('Plumbing loaded')
+    plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
+    plumbing['Full description'] = plumbing['text']
+    plumbing = plumbing.apply(clear, axis=1, args=('вода',))
+    log.debug('Preparing plumbing...')
+    plumbing = prepare(plumbing)
+    log.debug('Plumbing prepared')
+    return gas, electro, forest, river, plumbing
 
 
-gas, electro, forest, river = start()
+gas, electro, forest, river, plumbing = start()
 
 
 def classify(type_, data, exception=''):
@@ -152,9 +164,12 @@ def classify(type_, data, exception=''):
     elif type_ == 'водрес':
         log.debug('Selected model `водные ресурсы`')
         model = river
+    elif type_ == 'вода':
+        log.debug('Selected model `водоснабжение`')
+        model = plumbing
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
-    # test['Full description'] = test['text']  # No need, implemented in start()
+    test['Full description'] = test['text']  # No need, implemented in start()
     test['predicted'] = [None] * len(test)
     log.debug('Clearing texts')
     test = test.apply(clear, axis=1, args=(type_, exception))
@@ -167,7 +182,7 @@ def classify(type_, data, exception=''):
         res = clear_test['text']
     clear_test.loc[:, 'predicted'] = res
     full = pd.concat((clear_test, no_test))
-    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
+    return full[['id', 'text', 'predicted', 'final']].to_json(orient='records', force_ascii=False)
 
 
 # @app.route('/clf', methods=['POST'])
@@ -178,14 +193,13 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reding test')
-    test_forest = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
+    test_forest = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал', 'Уникальный идентификационный номер'])
     test_forest = test_forest.iloc[int(0.2 * len(test_forest)):]
-    test_forest = test_forest.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
+    test_forest = test_forest.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final', 'Уникальный идентификационный номер': 'id'})
     test_forest['Full description'] = test_forest['text']
     from random import randint
     log.debug('Generating random id\'s')
-    test_forest['id'] = [randint(0, 1000000000) for _ in range(len(test_forest))]
-    data = {"type": "водрес", "data": test_forest.to_dict(orient='records')}
+    data = {"type": "вода", "data": test_forest.to_dict(orient='records')}
     log.debug('Testing...')
     result = classify(data['type'], data['data'])
     log.debug('Writing...')
@@ -197,3 +211,4 @@ def test_model():
 log.debug('Flask app starts')
 # app.run()
 test_model()
+

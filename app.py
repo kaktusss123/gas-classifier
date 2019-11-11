@@ -51,6 +51,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'водрес':
             regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
             communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
+        elif type_ == 'вода':
+            regex = r'(^|\s|\W)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
+            communications = r'(^|\s|\W)(вод[аы]|коммуник)'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -124,14 +127,22 @@ def start():
     log.debug('River loaded')
     river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
     river['Full description'] = river['text']
-    river = river.apply(clear, axis=1, args=('лес',))
+    river = river.apply(clear, axis=1, args=('водрес',))
     log.debug('Preparing river...')
     river = prepare(river)
     log.debug('River prepared')
-    return gas, electro, forest, river
+    plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
+    log.debug('Plumbing loaded')
+    plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
+    plumbing['Full description'] = plumbing['text']
+    plumbing = plumbing.apply(clear, axis=1, args=('вода',))
+    log.debug('Preparing plumbing...')
+    plumbing = prepare(plumbing)
+    log.debug('Plumbing prepared')
+    return gas, electro, forest, river, plumbing
 
 
-gas, electro, forest, river = start()
+gas, electro, forest, river, plumbing = start()
 
 
 def classify(type_, data, exception=''):
@@ -149,9 +160,12 @@ def classify(type_, data, exception=''):
     elif type_ == 'водрес':
         log.debug('Selected model `водные ресурсы`')
         model = river
+    elif type_ == 'вода':
+        log.debug('Selected model `водоснабжение`')
+        model = plumbing
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
-    # test['Full description'] = test['text']  # No need, implemented in start()
+    test['Full description'] = test['text']
     test['predicted'] = [None] * len(test)
     log.debug('Clearing texts')
     test = test.apply(clear, axis=1, args=(type_, exception))
