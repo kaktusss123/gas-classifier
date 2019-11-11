@@ -59,7 +59,7 @@ def clear(row, type_, exception=''):
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
             communications = r'(?=(установлен\w*\s*|определен\w*\s*|уточнен\w*\s*|обозначен\w*\s*))границы'
-        sentences = split(r'[.?!;]', row.at['text'])
+        sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
         for s in sentences:
