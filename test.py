@@ -9,7 +9,9 @@ from flask import Flask, request
 import logging as log
 
 log.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = log.DEBUG)
-
+eng = 'ETOPAHKXCBMetopahkxcbm'
+rus = 'ЕТОРАНКХСВМеторанкхсвм'
+mapping = str.maketrans(dict(zip(eng, rus)))
 
 # app = Flask(__name__)
 log.debug('Flask app created')
@@ -34,25 +36,28 @@ def clear(row, type_, exception=''):
     try:
         regex = ''
         communications = ''
-        descr = row['Full description'].replace('ё', 'е')  # ' '.join(results)
+        descr = row['Full description'].lower().translate(mapping)
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
         if type_ == 'газ':
-            regex = r'(^|\s|\W)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
-            communications = r'(^|\s|\W)коммуник'
+            regex = r'(^|\s|\W|\d)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
+            communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'свет':
-            regex = r'(^|\s|\W)(электрич|свет)(?!к)'
-            communications = r'(^|\s|\W)коммуник'
+            regex = r'(^|\s|\W|\d)(электрич|свет)(?!к)'
+            communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'лес':
-            regex = r'(^|\s|\W|при)(лес|сосн[ыа])'
-            communications = r'(^|\s|\W)хвойн'
+            regex = r'(^|\s|\W|при|\d)(лес|сосн[ыа])'
+            communications = r'(^|\s|\W|\d)хвойн'
         elif type_ == 'водрес':
-            regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
-            communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
+            regex = r'(^|\s|\W|\d)(озер|ре[чк]|водоем|водохр)'
+            communications = r'(^|\s|\W|\d)(пляж|рыбал|берег|пруд)'
         elif type_ == 'вода':
-            regex = r'(^|\s|\W)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
-            communications = r'(^|\s|\W)(вод[аы]|коммуник)'
+            regex = r'(^|\s|\W|\d)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
+            communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
+        elif type_ == 'межевание':
+            regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
+            communications = r'(^|\s|\W|\d)границ'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -67,6 +72,7 @@ def clear(row, type_, exception=''):
         #     found = True
         if not results:
             row.at['predicted'] = 'нет данных'
+            print(descr, end='\n\n')
             return row
         else:
             descr = ' '.join(results)
@@ -96,6 +102,12 @@ def clear(row, type_, exception=''):
 
 
 def start():
+    ###
+    # Debug only
+    ###
+    gas, electro, forest, river, plumbing, mezh = None, None, None, None, None, None
+
+
     log.debug('Pre-start')
     gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
         'Описание', 'Газоснабжение финал'])
@@ -133,9 +145,6 @@ def start():
     log.debug('River prepared')
 
     plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
-    ###
-    plumbing = plumbing.iloc[:int(0.8 * len(plumbing))]
-    ###
     log.debug('Plumbing loaded')
     plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
     plumbing['Full description'] = plumbing['text']
@@ -143,15 +152,27 @@ def start():
     log.debug('Preparing plumbing...')
     plumbing = prepare(plumbing)
     log.debug('Plumbing prepared')
-    return gas, electro, forest, river, plumbing
+
+    mezh = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание'])
+    ###
+    mezh = mezh.iloc[:int(0.8 * len(mezh))]
+    ###
+    log.debug('Mezh loaded')
+    mezh = mezh.rename(columns={'Описание': 'text', 'Межевание': 'final'})
+    mezh['Full description'] = mezh['text']
+    mezh = mezh.apply(clear, axis=1, args=('межевание',))
+    log.debug('Preparing mezh...')
+    mezh = prepare(mezh)
+    log.debug('Mezh prepared')
+    return gas, electro, forest, river, plumbing, mezh
 
 
-gas, electro, forest, river, plumbing = start()
+gas, electro, forest, river, plumbing, mezh = start()
 
 
 def classify(type_, data, exception=''):
     log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
-    global gas, electro, forest
+    global gas, electro, forest, river, plumbing, mezh
     if type_ == 'газ':
         log.debug('Selected model `газ`')
         model = gas
@@ -167,6 +188,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'вода':
         log.debug('Selected model `водоснабжение`')
         model = plumbing
+    elif type_ == 'межевание':
+        log.debug('Selected model `межевание`')
+        model = mezh
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
@@ -193,18 +217,16 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reding test')
-    test_forest = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал', 'Уникальный идентификационный номер'])
+    test_forest = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание', 'Уникальный идентификационный номер'])
     test_forest = test_forest.iloc[int(0.2 * len(test_forest)):]
-    test_forest = test_forest.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final', 'Уникальный идентификационный номер': 'id'})
+    test_forest = test_forest.rename(columns={'Описание': 'text', 'Межевание': 'final', 'Уникальный идентификационный номер': 'id'})
     test_forest['Full description'] = test_forest['text']
-    from random import randint
-    log.debug('Generating random id\'s')
-    data = {"type": "вода", "data": test_forest.to_dict(orient='records')}
+    data = {"type": "межевание", "data": test_forest.to_dict(orient='records')}
     log.debug('Testing...')
     result = classify(data['type'], data['data'])
     log.debug('Writing...')
     result = pd.read_json(result, orient='records')
-    result.to_excel('forest_result.xlsx')
+    result.to_excel('mezh_result.xlsx')
 
 
 

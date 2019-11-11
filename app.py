@@ -10,7 +10,9 @@ import logging as log
 
 log.basicConfig(
     format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level=log.DEBUG)
-
+eng = 'ETOPAHKXCBMetopahkxcbm'
+rus = 'ЕТОРАНКХСВМеторанкхсвм'
+mapping = str.maketrans(dict(zip(eng, rus)))
 
 app = Flask(__name__)
 log.debug('Flask app created')
@@ -35,25 +37,28 @@ def clear(row, type_, exception=''):
     try:
         regex = ''
         communications = ''
-        descr = row['Full description'].replace('ё', 'е')  # ' '.join(results)
+        descr = row['Full description'].lower().translate(mapping)
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
         if type_ == 'газ':
-            regex = r'(^|\s|\W)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
-            communications = r'(^|\s|\W)коммуник'
+            regex = r'(^|\s|\W|\d)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
+            communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'свет':
-            regex = r'(^|\s|\W)(электрич|свет)(?!к)'
-            communications = r'(^|\s|\W)коммуник'
+            regex = r'(^|\s|\W|\d)(электрич|свет)(?!к)'
+            communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'лес':
-            regex = r'(^|\s|\W|при)(лес|сосн[ыа])'
-            communications = r'(^|\s|\W)хвойн'
+            regex = r'(^|\s|\W|при|\d)(лес|сосн[ыа])'
+            communications = r'(^|\s|\W|\d)хвойн'
         elif type_ == 'водрес':
-            regex = r'(^|\s|\W)(озер|ре[чк]|водоем|водохр)'
-            communications = r'(^|\s|\W)(пляж|рыбал|берег|пруд)'
+            regex = r'(^|\s|\W|\d)(озер|ре[чк]|водоем|водохр)'
+            communications = r'(^|\s|\W|\d)(пляж|рыбал|берег|пруд)'
         elif type_ == 'вода':
-            regex = r'(^|\s|\W)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
-            communications = r'(^|\s|\W)(вод[аы]|коммуник)'
+            regex = r'(^|\s|\W|\d)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
+            communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
+        elif type_ == 'межевание':
+            regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
+            communications = r'(^|\s|\W|\d)границ'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -139,15 +144,22 @@ def start():
     log.debug('Preparing plumbing...')
     plumbing = prepare(plumbing)
     log.debug('Plumbing prepared')
-    return gas, electro, forest, river, plumbing
+    mezh = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание'])
+    log.debug('Mezh loaded')
+    mezh = mezh.rename(columns={'Описание': 'text', 'Межевание': 'final'})
+    mezh['Full description'] = mezh['text']
+    mezh = mezh.apply(clear, axis=1, args=('межевание',))
+    log.debug('Preparing mezh...')
+    mezh = prepare(mezh)
+    log.debug('Mezh prepared')
+    return gas, electro, forest, river, plumbing, mezh
 
 
-gas, electro, forest, river, plumbing = start()
+gas, electro, forest, river, plumbing, mezh = start()
 
 
 def classify(type_, data, exception=''):
     log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
-    global gas, electro, forest
     if type_ == 'газ':
         log.debug('Selected model `газ`')
         model = gas
@@ -163,6 +175,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'вода':
         log.debug('Selected model `водоснабжение`')
         model = plumbing
+    elif type_ == 'межевание':
+        log.debug('Selected model `межевание`')
+        model = mezh
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
