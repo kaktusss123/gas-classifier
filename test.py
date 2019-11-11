@@ -57,7 +57,7 @@ def clear(row, type_, exception=''):
             communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
-            communications = r'(^|\s|\W|\d)границ'
+            communications = r'(^|\s|\W|\d)границы'
         elif type_ == 'доступ':
             regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
             communications = r'(^|\s|\W|\d)(бетон|насып)'

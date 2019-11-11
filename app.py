@@ -45,7 +45,7 @@ def clear(row, type_, exception=''):
             regex = r'(^|\s|\W|\d)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
             communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'свет':
-            regex = r'(^|\s|\W|\d)(электрич|свет)(?!к)'
+            regex = r'(^|\s|\W|\d)(электр|свет|эл-во|трансформатор)(?!ичк)'
             communications = r'(^|\s|\W|\d)коммуник'
         elif type_ == 'лес':
             regex = r'(^|\s|\W|при|\d)(лес|сосн[ыа])'
@@ -58,7 +58,7 @@ def clear(row, type_, exception=''):
             communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
-            communications = r'(^|\s|\W|\d)границы'
+            communications = r'(?=(установлен\w*\s*|определен\w*\s*|уточнен\w*\s*|обозначен\w*\s*))границы'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
