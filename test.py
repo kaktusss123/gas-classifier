@@ -61,7 +61,7 @@ def clear(row, type_, exception=''):
         elif type_ == 'доступ':
             regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
             communications = r'(^|\s|\W|\d)(бетон|насып)'
-        sentences = split(r'[.?!;]', row.at['text'])
+        sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
         for s in sentences:

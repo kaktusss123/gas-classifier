@@ -59,6 +59,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
             communications = r'(?=(установлен\w*\s*|определен\w*\s*|уточнен\w*\s*|обозначен\w*\s*))границы'
+        elif type_ == 'доступ':
+            regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
+            communications = r'(^|\s|\W|\d)(бетон|насып)'
         sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
@@ -152,10 +155,18 @@ def start():
     log.debug('Preparing mezh...')
     mezh = prepare(mezh)
     log.debug('Mezh prepared')
-    return gas, electro, forest, river, plumbing, mezh
+    dostup = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал'])
+    log.debug('Dostup loaded')
+    dostup = dostup.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final'})
+    dostup['Full description'] = dostup['text']
+    dostup = dostup.apply(clear, axis=1, args=('доступ',))
+    log.debug('Preparing dostup...')
+    dostup = prepare(dostup)
+    log.debug('Dostup prepared')
+    return gas, electro, forest, river, plumbing, mezh, dostup
 
 
-gas, electro, forest, river, plumbing, mezh = start()
+gas, electro, forest, river, plumbing, mezh, dostup = start()
 
 
 def classify(type_, data, exception=''):
@@ -178,6 +189,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'межевание':
         log.debug('Selected model `межевание`')
         model = mezh
+    elif type_ == 'доступ':
+        log.debug('Selected model `доступ к участку`')
+        model = dostup
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
