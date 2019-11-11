@@ -58,6 +58,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'межевание':
             regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
             communications = r'(^|\s|\W|\d)границ'
+        elif type_ == 'доступ':
+            regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
+            communications = r'(^|\s|\W|\d)(бетон|насып)'
         sentences = split(r'[.?!;]', row.at['text'])
         results = []
         found = False
@@ -105,69 +108,78 @@ def start():
     ###
     # Debug only
     ###
-    gas, electro, forest, river, plumbing, mezh = None, None, None, None, None, None
+    gas, electro, forest, river, plumbing, mezh, dostup = None, None, None, None, None, None, None
 
 
     log.debug('Pre-start')
-    gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
-        'Описание', 'Газоснабжение финал'])
-    log.debug('Gas loaded')
-    gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
-    gas['Full description'] = gas['text']
-    gas = gas.apply(clear, axis=1, args=('газ',))
-    log.debug('Preparing gas...')
-    gas = prepare(gas)
-    log.debug('Gas prepared')
-    electro = pd.read_excel('input.xlsx', sheet_name='электричество', usecols=[
-        'Описание', 'Электричество финал']).rename(columns={'Описание': 'text', 'Электричество финал': 'final'})
-    log.debug('Electricity loaded')
-    electro['Full description'] = electro['text']
-    electro = electro.apply(clear, axis=1, args=('свет',))
-    log.debug('Preparing electricity...')
-    electro = prepare(electro)
-    log.debug('Electricity prepared')
-    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=['Описание', 'Лес из описания финал'])
-    log.debug('Forest loaded')
-    forest = forest.rename(columns={'Описание': 'text', 'Лес из описания финал': 'final'})
-    forest['Full description'] = forest['text']
-    forest = forest.apply(clear, axis=1, args=('лес',))
-    log.debug('Preparing forest...')
-    forest = prepare(forest)
-    log.debug('Forest prepared')
+    # gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
+    #     'Описание', 'Газоснабжение финал'])
+    # log.debug('Gas loaded')
+    # gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
+    # gas['Full description'] = gas['text']
+    # gas = gas.apply(clear, axis=1, args=('газ',))
+    # log.debug('Preparing gas...')
+    # gas = prepare(gas)
+    # log.debug('Gas prepared')
+    # electro = pd.read_excel('input.xlsx', sheet_name='электричество', usecols=[
+    #     'Описание', 'Электричество финал']).rename(columns={'Описание': 'text', 'Электричество финал': 'final'})
+    # log.debug('Electricity loaded')
+    # electro['Full description'] = electro['text']
+    # electro = electro.apply(clear, axis=1, args=('свет',))
+    # log.debug('Preparing electricity...')
+    # electro = prepare(electro)
+    # log.debug('Electricity prepared')
+    # forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=['Описание', 'Лес из описания финал'])
+    # log.debug('Forest loaded')
+    # forest = forest.rename(columns={'Описание': 'text', 'Лес из описания финал': 'final'})
+    # forest['Full description'] = forest['text']
+    # forest = forest.apply(clear, axis=1, args=('лес',))
+    # log.debug('Preparing forest...')
+    # forest = prepare(forest)
+    # log.debug('Forest prepared')
 
-    river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
-    log.debug('River loaded')
-    river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
-    river['Full description'] = river['text']
-    river = river.apply(clear, axis=1, args=('водрес',))
-    log.debug('Preparing river...')
-    river = prepare(river)
-    log.debug('River prepared')
+    # river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
+    # log.debug('River loaded')
+    # river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
+    # river['Full description'] = river['text']
+    # river = river.apply(clear, axis=1, args=('водрес',))
+    # log.debug('Preparing river...')
+    # river = prepare(river)
+    # log.debug('River prepared')
 
-    plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
-    log.debug('Plumbing loaded')
-    plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
-    plumbing['Full description'] = plumbing['text']
-    plumbing = plumbing.apply(clear, axis=1, args=('вода',))
-    log.debug('Preparing plumbing...')
-    plumbing = prepare(plumbing)
-    log.debug('Plumbing prepared')
+    # plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
+    # log.debug('Plumbing loaded')
+    # plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
+    # plumbing['Full description'] = plumbing['text']
+    # plumbing = plumbing.apply(clear, axis=1, args=('вода',))
+    # log.debug('Preparing plumbing...')
+    # plumbing = prepare(plumbing)
+    # log.debug('Plumbing prepared')
 
-    mezh = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание'])
+    # mezh = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание'])
+    # log.debug('Mezh loaded')
+    # mezh = mezh.rename(columns={'Описание': 'text', 'Межевание': 'final'})
+    # mezh['Full description'] = mezh['text']
+    # mezh = mezh.apply(clear, axis=1, args=('межевание',))
+    # log.debug('Preparing mezh...')
+    # mezh = prepare(mezh)
+    # log.debug('Mezh prepared')
+
+    dostup = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал'])
     ###
-    mezh = mezh.iloc[:int(0.8 * len(mezh))]
+    dostup = dostup.iloc[:int(0.8 * len(dostup))]
     ###
-    log.debug('Mezh loaded')
-    mezh = mezh.rename(columns={'Описание': 'text', 'Межевание': 'final'})
-    mezh['Full description'] = mezh['text']
-    mezh = mezh.apply(clear, axis=1, args=('межевание',))
-    log.debug('Preparing mezh...')
-    mezh = prepare(mezh)
-    log.debug('Mezh prepared')
-    return gas, electro, forest, river, plumbing, mezh
+    log.debug('Dostup loaded')
+    dostup = dostup.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final'})
+    dostup['Full description'] = dostup['text']
+    dostup = dostup.apply(clear, axis=1, args=('доступ',))
+    log.debug('Preparing dostup...')
+    dostup = prepare(dostup)
+    log.debug('Dostup prepared')
+    return gas, electro, forest, river, plumbing, mezh, dostup
 
 
-gas, electro, forest, river, plumbing, mezh = start()
+gas, electro, forest, river, plumbing, mezh, dostup = start()
 
 
 def classify(type_, data, exception=''):
@@ -191,6 +203,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'межевание':
         log.debug('Selected model `межевание`')
         model = mezh
+    elif type_ == 'доступ':
+        log.debug('Selected model `доступ к участку`')
+        model = dostup
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
@@ -217,16 +232,16 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reding test')
-    test_forest = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание', 'Уникальный идентификационный номер'])
+    test_forest = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал', 'Уникальный идентификационный номер'])
     test_forest = test_forest.iloc[int(0.2 * len(test_forest)):]
-    test_forest = test_forest.rename(columns={'Описание': 'text', 'Межевание': 'final', 'Уникальный идентификационный номер': 'id'})
+    test_forest = test_forest.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final', 'Уникальный идентификационный номер': 'id'})
     test_forest['Full description'] = test_forest['text']
-    data = {"type": "межевание", "data": test_forest.to_dict(orient='records')}
+    data = {"type": "доступ", "data": test_forest.to_dict(orient='records')}
     log.debug('Testing...')
     result = classify(data['type'], data['data'])
     log.debug('Writing...')
     result = pd.read_json(result, orient='records')
-    result.to_excel('mezh_result.xlsx')
+    result.to_excel('dostup_result.xlsx')
 
 
 
