@@ -165,7 +165,7 @@ def classify(type_, data, exception=''):
         model = plumbing
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
-    test['Full description'] = test['text']
+    test['Full description'] = test['text']  # No need, implemented in start()
     test['predicted'] = [None] * len(test)
     log.debug('Clearing texts')
     test = test.apply(clear, axis=1, args=(type_, exception))
