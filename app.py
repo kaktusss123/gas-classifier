@@ -10,8 +10,8 @@ import logging as log
 
 log.basicConfig(
     format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level=log.DEBUG)
-eng = 'ETOPAHKXCBMetopahkxcbm'
-rus = 'ЕТОРАНКХСВМеторанкхсвм'
+eng = 'ETOPAHKXCBMetopahkxcbmё'
+rus = 'ЕТОРАНКХСВМеторанкхсвме'
 mapping = str.maketrans(dict(zip(eng, rus)))
 
 app = Flask(__name__)
@@ -62,6 +62,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'доступ':
             regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
             communications = r'(^|\s|\W|\d)(бетон|насып)'
+        elif type_ == 'вход':
+            regex = r'(^|\s|\W|\d)вход'
+            communications = r'(^|\s|\W|\d)вх'
         sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
@@ -163,14 +166,22 @@ def start():
     log.debug('Preparing dostup...')
     dostup = prepare(dostup)
     log.debug('Dostup prepared')
-    return gas, electro, forest, river, plumbing, mezh, dostup
+    entrance = pd.read_excel('input.xlsx', sheet_name='отдельный вход', usecols=['Описание', 'Вход'])
+    log.debug('entrance loaded')
+    entrance = entrance.rename(columns={'Описание': 'text', 'Вход': 'final'})
+    entrance['Full description'] = entrance['text']
+    entrance = entrance.apply(clear, axis=1, args=('вход',))
+    log.debug('Preparing entrance...')
+    entrance = prepare(entrance)
+    log.debug('entrance prepared')
+    return gas, electro, forest, river, plumbing, mezh, dostup, entrance
 
 
-gas, electro, forest, river, plumbing, mezh, dostup = start()
+gas, electro, forest, river, plumbing, mezh, dostup, entrance = start()
 
 
 def classify(type_, data, exception=''):
-    log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
+    log.debug(f'Classifying type: {type_}, exception: {exception}')  # ', data: {data}')
     if type_ == 'газ':
         log.debug('Selected model `газ`')
         model = gas
@@ -192,6 +203,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'доступ':
         log.debug('Selected model `доступ к участку`')
         model = dostup
+    elif type_ == 'вход':
+        log.debug('Selected model `отдельный вход`')
+        model = entrance
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()

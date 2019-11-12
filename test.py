@@ -9,8 +9,8 @@ from flask import Flask, request
 import logging as log
 
 log.basicConfig(format = u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level = log.DEBUG)
-eng = 'ETOPAHKXCBMetopahkxcbm'
-rus = 'ЕТОРАНКХСВМеторанкхсвм'
+eng = 'ETOPAHKXCBMetopahkxcbmё'
+rus = 'ЕТОРАНКХСВМеторанкхсвме'
 mapping = str.maketrans(dict(zip(eng, rus)))
 
 # app = Flask(__name__)
@@ -61,6 +61,9 @@ def clear(row, type_, exception=''):
         elif type_ == 'доступ':
             regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
             communications = r'(^|\s|\W|\d)(бетон|насып)'
+        elif type_ == 'вход':
+            regex = r'(^|\s|\W|\d)вход'
+            communications = r'(^|\s|\W|\d)вх'
         sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
@@ -108,7 +111,7 @@ def start():
     ###
     # Debug only
     ###
-    gas, electro, forest, river, plumbing, mezh, dostup = None, None, None, None, None, None, None
+    gas, electro, forest, river, plumbing, mezh, dostup, entrance = None, None, None, None, None, None, None, None
 
 
     log.debug('Pre-start')
@@ -165,25 +168,34 @@ def start():
     # mezh = prepare(mezh)
     # log.debug('Mezh prepared')
 
-    dostup = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал'])
+    # dostup = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал'])
+    # log.debug('Dostup loaded')
+    # dostup = dostup.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final'})
+    # dostup['Full description'] = dostup['text']
+    # dostup = dostup.apply(clear, axis=1, args=('доступ',))
+    # log.debug('Preparing dostup...')
+    # dostup = prepare(dostup)
+    # log.debug('Dostup prepared')
+
+    entrance = pd.read_excel('input.xlsx', sheet_name='отдельный вход', usecols=['Описание', 'Вход'])
     ###
-    dostup = dostup.iloc[:int(0.8 * len(dostup))]
+    entrance = entrance.iloc[:int(0.8 * len(entrance))]
     ###
-    log.debug('Dostup loaded')
-    dostup = dostup.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final'})
-    dostup['Full description'] = dostup['text']
-    dostup = dostup.apply(clear, axis=1, args=('доступ',))
-    log.debug('Preparing dostup...')
-    dostup = prepare(dostup)
-    log.debug('Dostup prepared')
-    return gas, electro, forest, river, plumbing, mezh, dostup
+    log.debug('entrance loaded')
+    entrance = entrance.rename(columns={'Описание': 'text', 'Вход': 'final'})
+    entrance['Full description'] = entrance['text']
+    entrance = entrance.apply(clear, axis=1, args=('вход',))
+    log.debug('Preparing entrance...')
+    entrance = prepare(entrance)
+    log.debug('entrance prepared')
+    return gas, electro, forest, river, plumbing, mezh, dostup, entrance
 
 
-gas, electro, forest, river, plumbing, mezh, dostup = start()
+gas, electro, forest, river, plumbing, mezh, dostup, entrance = start()
 
 
 def classify(type_, data, exception=''):
-    log.debug(f'Classifying type: {type_}, exception: {exception}, data: {data}')
+    log.debug(f'Classifying type: {type_}, exception: {exception}')  # , data: {data}')
     global gas, electro, forest, river, plumbing, mezh
     if type_ == 'газ':
         log.debug('Selected model `газ`')
@@ -206,6 +218,9 @@ def classify(type_, data, exception=''):
     elif type_ == 'доступ':
         log.debug('Selected model `доступ к участку`')
         model = dostup
+    elif type_ == 'вход':
+        log.debug('Selected model `отдельный вход`')
+        model = entrance
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
@@ -232,16 +247,16 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reding test')
-    test_forest = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал', 'Уникальный идентификационный номер'])
-    test_forest = test_forest.iloc[int(0.2 * len(test_forest)):]
-    test_forest = test_forest.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final', 'Уникальный идентификационный номер': 'id'})
+    test_forest = pd.read_excel('input.xlsx', sheet_name='отдельный вход', usecols=['Описание', 'Вход', 'Код'])
+    test_forest = test_forest.iloc[int(0.8 * len(test_forest)):]
+    test_forest = test_forest.rename(columns={'Описание': 'text', 'Вход': 'final', 'Код': 'id'})
     test_forest['Full description'] = test_forest['text']
-    data = {"type": "доступ", "data": test_forest.to_dict(orient='records')}
+    data = {"type": "вход", "data": test_forest.to_dict(orient='records')}
     log.debug('Testing...')
     result = classify(data['type'], data['data'])
     log.debug('Writing...')
     result = pd.read_json(result, orient='records')
-    result.to_excel('dostup_result.xlsx')
+    result.to_excel('entrance_result.xlsx')
 
 
 
