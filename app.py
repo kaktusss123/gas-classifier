@@ -94,7 +94,7 @@ def new_start():
         files = json.load(f)['files']
     for t, f in files.items():
         log.debug(f'Loading `{t}`')
-        files[t] = pd.read_json(f'files/{f}', orient='records')
+        files[t] = pd.read_json(f'files/{f}', orient='records', encoding='cp1251')
         ###
         if t == 'отделка':
             files[t] = files[t].iloc[int(0.8 * len(f)):]
