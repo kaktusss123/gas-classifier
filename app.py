@@ -17,6 +17,9 @@ mapping = str.maketrans(dict(zip(eng, rus)))
 app = Flask(__name__)
 log.debug('Flask app created')
 
+with open('config.json', encoding='utf-8') as f:
+    regexes = json.load(f)['regex']
+
 
 def fit_model(clf, train, **params):
     texts = train['text']
@@ -41,30 +44,8 @@ def clear(row, type_, exception=''):
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
-        if type_ == 'газ':
-            regex = r'(^|\s|\W|\d)газ(?!(он|пром|пено|бетон| баллон|ет|овик))'
-            communications = r'(^|\s|\W|\d)коммуник'
-        elif type_ == 'свет':
-            regex = r'(^|\s|\W|\d)(электр|свет|эл-во|трансформатор)(?!ичк)'
-            communications = r'(^|\s|\W|\d)коммуник'
-        elif type_ == 'лес':
-            regex = r'(^|\s|\W|при|\d)(лес|сосн[ыа])'
-            communications = r'(^|\s|\W|\d)хвойн'
-        elif type_ == 'водрес':
-            regex = r'(^|\s|\W|\d)(озер|ре[чк]|водоем|водохр)'
-            communications = r'(^|\s|\W|\d)(пляж|рыбал|берег|пруд)'
-        elif type_ == 'вода':
-            regex = r'(^|\s|\W|\d)(водо(пров|снабж)|коло(д[ец]|нк)|скважин)'
-            communications = r'(^|\s|\W|\d)(вод[аы]|коммуник)'
-        elif type_ == 'межевание':
-            regex = r'(^|\s|\W|от|раз|до|об|за|про|\d)(меж[еёо]|геодез)'
-            communications = r'(?=(установлен\w*\s*|определен\w*\s*|уточнен\w*\s*|обозначен\w*\s*))границы'
-        elif type_ == 'доступ':
-            regex = r'(^|\s|\W|\d|за)(асфальт|грави|щеб[ен]|грунт)'
-            communications = r'(^|\s|\W|\d)(бетон|насып)'
-        elif type_ == 'вход':
-            regex = r'(^|\s|\W|\d)вход'
-            communications = r'(^|\s|\W|\d)вх'
+        regex = regexes[type_]['regex']
+        communications = regexes[type_]['communications']
         sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
         results = []
         found = False
@@ -107,105 +88,35 @@ def clear(row, type_, exception=''):
     return row
 
 
-def start():
-    log.debug('Pre-start')
-    gas = pd.read_excel('input.xlsx', sheet_name='газоснабжение', usecols=[
-        'Описание', 'Газоснабжение финал'])
-    log.debug('Gas loaded')
-    gas = gas.rename(columns={'Описание': 'text', 'Газоснабжение финал': 'final'})
-    gas['Full description'] = gas['text']
-    gas = gas.apply(clear, axis=1, args=('газ',))
-    log.debug('Preparing gas...')
-    gas = prepare(gas)
-    log.debug('Gas prepared')
-    electro = pd.read_excel('input.xlsx', sheet_name='электричество', usecols=[
-        'Описание', 'Электричество финал']).rename(columns={'Описание': 'text', 'Электричество финал': 'final'})
-    log.debug('Electricity loaded')
-    electro['Full description'] = electro['text']
-    electro = electro.apply(clear, axis=1, args=('свет',))
-    log.debug('Preparing electricity...')
-    electro = prepare(electro)
-    log.debug('Electricity prepared')
-    forest = pd.read_excel('input.xlsx', sheet_name='лесные ресурсы', usecols=['Описание', 'Лес из описания финал'])
-    log.debug('Forest loaded')
-    forest = forest.rename(columns={'Описание': 'text', 'Лес из описания финал': 'final'})
-    forest['Full description'] = forest['text']
-    forest = forest.apply(clear, axis=1, args=('лес',))
-    log.debug('Preparing forest...')
-    forest = prepare(forest)
-    log.debug('Forest prepared')
-    river = pd.read_excel('input.xlsx', sheet_name='водные ресурсы', usecols=['Описание', 'Водные ресурсы из описания финал'])
-    log.debug('River loaded')
-    river = river.rename(columns={'Описание': 'text', 'Водные ресурсы из описания финал': 'final'})
-    river['Full description'] = river['text']
-    river = river.apply(clear, axis=1, args=('водрес',))
-    log.debug('Preparing river...')
-    river = prepare(river)
-    log.debug('River prepared')
-    plumbing = pd.read_excel('input.xlsx', sheet_name='водоснабжение', usecols=['Описание', 'Водоснабжение финал'])
-    log.debug('Plumbing loaded')
-    plumbing = plumbing.rename(columns={'Описание': 'text', 'Водоснабжение финал': 'final'})
-    plumbing['Full description'] = plumbing['text']
-    plumbing = plumbing.apply(clear, axis=1, args=('вода',))
-    log.debug('Preparing plumbing...')
-    plumbing = prepare(plumbing)
-    log.debug('Plumbing prepared')
-    mezh = pd.read_excel('input.xlsx', sheet_name='межевание', usecols=['Описание', 'Межевание'])
-    log.debug('Mezh loaded')
-    mezh = mezh.rename(columns={'Описание': 'text', 'Межевание': 'final'})
-    mezh['Full description'] = mezh['text']
-    mezh = mezh.apply(clear, axis=1, args=('межевание',))
-    log.debug('Preparing mezh...')
-    mezh = prepare(mezh)
-    log.debug('Mezh prepared')
-    dostup = pd.read_excel('input.xlsx', sheet_name='доступ к участку', usecols=['Описание', 'Доступ к участку финал'])
-    log.debug('Dostup loaded')
-    dostup = dostup.rename(columns={'Описание': 'text', 'Доступ к участку финал': 'final'})
-    dostup['Full description'] = dostup['text']
-    dostup = dostup.apply(clear, axis=1, args=('доступ',))
-    log.debug('Preparing dostup...')
-    dostup = prepare(dostup)
-    log.debug('Dostup prepared')
-    entrance = pd.read_excel('input.xlsx', sheet_name='отдельный вход', usecols=['Описание', 'Вход'])
-    log.debug('entrance loaded')
-    entrance = entrance.rename(columns={'Описание': 'text', 'Вход': 'final'})
-    entrance['Full description'] = entrance['text']
-    entrance = entrance.apply(clear, axis=1, args=('вход',))
-    log.debug('Preparing entrance...')
-    entrance = prepare(entrance)
-    log.debug('entrance prepared')
-    return gas, electro, forest, river, plumbing, mezh, dostup, entrance
+def new_start():
+    log.info('Loading tables')
+    with open('config.json', encoding='utf-8') as f:
+        files = json.load(f)['files']
+    for t, f in files.items():
+        log.debug(f'Loading `{t}`')
+        files[t] = pd.read_json(f'files/{f}', orient='records')
+        ###
+        if t == 'отделка':
+            files[t] = files[t].iloc[int(0.8 * len(f)):]
+        ###
+        log.debug(f'{t} loaded, clearing')
+        files[t] = files[t].rename(columns={'Описание': 'text', 'Код': 'id', 'Финал': 'final'})
+        files[t]['Full description'] = files[t]['text']
+        files[t] = files[t].apply(clear, axis=1, args=(t,))
+        log.debug(f'Preparing {t}')
+        files[t] = prepare(files[t])
+        log.debug(f'{t} prepared')
+    return files
 
-
-gas, electro, forest, river, plumbing, mezh, dostup, entrance = start()
+files = new_start()
 
 
 def classify(type_, data, exception=''):
     log.debug(f'Classifying type: {type_}, exception: {exception}')  # ', data: {data}')
-    if type_ == 'газ':
-        log.debug('Selected model `газ`')
-        model = gas
-    elif type_ == 'свет':
-        log.debug('Selected model `свет`')
-        model = electro
-    elif type_ == 'лес':
-        log.debug('Selected model `лес`')
-        model = forest
-    elif type_ == 'водрес':
-        log.debug('Selected model `водные ресурсы`')
-        model = river
-    elif type_ == 'вода':
-        log.debug('Selected model `водоснабжение`')
-        model = plumbing
-    elif type_ == 'межевание':
-        log.debug('Selected model `межевание`')
-        model = mezh
-    elif type_ == 'доступ':
-        log.debug('Selected model `доступ к участку`')
-        model = dostup
-    elif type_ == 'вход':
-        log.debug('Selected model `отдельный вход`')
-        model = entrance
+    model = files.get(type_)
+    if type_ is None:
+        log.error('Unresolved type')
+        return 'Unresolved type'
     # Paste new models here and into start() func
     test = pd.read_json(json.dumps(data), orient='records')
     test['Full description'] = test['text']  # No need, implemented in start()
