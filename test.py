@@ -186,12 +186,12 @@ def new_start():
     log.info('Loading tables')
     with open('config.json', encoding='utf-8') as f:
         files = json.load(f)['files']
-    for t, f in {"вход": "отдельный вход.json"}.items():  # files.items():
+    for t, f in {"постройки": "постройки.json"}.items():  # files.items():
         log.debug(f'Loading `{t}`')
         files[t] = pd.read_json(f'files/{f}', orient='records')
         ###
-        # if t == 'вход':
-        #     files[t] = files[t].iloc[:int(0.8 * len(files[t]))]
+        if t == 'постройки':
+            files[t] = files[t].iloc[:int(0.8 * len(files[t]))]
         ###
         log.debug(f'{t} loaded, clearing')
         files[t] = files[t].rename(columns={'Описание': 'text', 'Код': 'id', 'Финал': 'final'})
@@ -227,7 +227,7 @@ def classify(type_, data, exception=''):
         res = clear_test['text']
     clear_test.loc[:, 'predicted'] = res
     full = pd.concat((clear_test, no_test))
-    return full[['id', 'text', 'predicted']].to_json(orient='records', force_ascii=False)
+    return full[['id', 'text', 'predicted', 'final']].to_json(orient='records', force_ascii=False)
 
 
 # @app.route('/clf', methods=['POST'])
@@ -238,13 +238,13 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reading test')
-    name = 'отдельный вход'
+    name = 'постройки'
     # test_forest = pd.read_excel('input.xlsx', sheet_name=name, usecols=['Описание', 'Финал', 'Код'])
-    test_forest = pd.read_csv('test_commerce.csv', sep=';', header=0, usecols=['Код', 'Описание'])
-    # test_forest = test_forest.iloc[int(0.8 * len(test_forest)):]
+    test_forest = pd.read_json(f'files/{name}.json', orient='records')
+    test_forest = test_forest.iloc[int(0.8 * len(test_forest)):]
     test_forest = test_forest.rename(columns={'Описание': 'text', 'Финал': 'final', 'Код': 'id'})
     test_forest['Full description'] = test_forest['text']
-    for name in ['вход']:  # files:
+    for name in ['постройки']:  # files:
         log.info(f'Classifying `{name}`')
         data = {"type": name, "data": test_forest.to_dict(orient='records')}
         log.debug('Testing...')

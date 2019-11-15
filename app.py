@@ -10,8 +10,8 @@ import logging as log
 
 log.basicConfig(
     format=u'%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s', level=log.DEBUG)
-eng = 'ETOPAHKXCBMetopahkxcbmё'
-rus = 'ЕТОРАНКХСВМеторанкхсвме'
+eng = 'ETOPAHKXCBMetopahkxcbmёu'
+rus = 'ЕТОРАНКХСВМеторанкхсвмеи'
 mapping = str.maketrans(dict(zip(eng, rus)))
 
 app = Flask(__name__)
@@ -96,8 +96,8 @@ def new_start():
         log.debug(f'Loading `{t}`')
         files[t] = pd.read_json(f'files/{f}', orient='records', encoding='cp1251')
         ###
-        if t == 'отделка':
-            files[t] = files[t].iloc[int(0.8 * len(f)):]
+        # if t == 'отделка':
+        #     files[t] = files[t].iloc[int(0.8 * len(f)):]
         ###
         log.debug(f'{t} loaded, clearing')
         files[t] = files[t].rename(columns={'Описание': 'text', 'Код': 'id', 'Финал': 'final'})
