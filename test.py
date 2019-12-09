@@ -39,48 +39,24 @@ def clear(row, type_, exception=''):
     try:
         regex = ''
         communications = ''
+        exception = exception or regexes[type_].get('exception')
         descr = row['Full description'].lower().translate(mapping)
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
         regex = regexes[type_]['regex']
         communications = regexes[type_]['communications']
-        sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
+        sentences = split(r'[.?!;]', descr)
         results = []
-        found = False
         for s in sentences:
-            if search(regex, s, flags=re.IGNORECASE):
+            fregex = list(filter(lambda x: x.strip(), map(lambda x: ''.join(x), re.findall(regex, s))))
+            if not fregex:
+                fregex = list(filter(lambda x: x.strip(), map(lambda x: ''.join(x), re.findall(communications, s))))
+            if fregex:
                 results.append(s)
-        if not results:
-            for s in sentences:
-                if search(communications, s, flags=re.IGNORECASE):
-                    results.append(s)
-        # if search(regex, descr, re.IGNORECASE) or search(r'(^|\s|,|\()коммуник', descr, re.IGNORECASE):
-        #     found = True
-        if not results:
+        row.at['text'] = ' '.join(results)
+        if not row.at['text'].strip():
             row.at['predicted'] = 'нет данных'
-            return row
-        else:
-            descr = ' '.join(results)
-            splitted = list(filter(lambda x: x, split(r'([:!?., ])', descr)))
-            new_descr = ''
-            if len(splitted) > 20:
-                for i, e in enumerate(splitted):
-                    if search(regex, e, re.IGNORECASE):
-                        start = max(i - 20, 0)
-                        end = min(i + 21, len(splitted))
-                        new_descr = ' '.join(splitted[start: end])
-                        row.at['text'] = new_descr
-                        return row
-                for i, e in enumerate(splitted):
-                    if search(communications, e, re.IGNORECASE):
-                        start = max(i - 20, 0)
-                        end = min(i + 21, len(splitted))
-                        new_descr = ' '.join(splitted[start: end])
-                        row.at['text'] = new_descr
-                        return row
-
-            row.at['text'] = descr
     except Exception as e:
         print(f'{e.__class__.__name__}: {e}')
     row.at['text'] = str(row.at['text'])
@@ -186,17 +162,18 @@ def new_start():
     log.info('Loading tables')
     with open('config.json', encoding='utf-8') as f:
         files = json.load(f)['files']
-    for t, f in {"постройки": "постройки.json"}.items():  # files.items():
+    for t, f in {"есть_площадь": "есть_площадь.json"}.items():  # files.items():
         log.debug(f'Loading `{t}`')
         files[t] = pd.read_json(f'files/{f}', orient='records')
         ###
-        if t == 'постройки':
+        if t == 'есть_площадь':
             files[t] = files[t].iloc[:int(0.8 * len(files[t]))]
         ###
         log.debug(f'{t} loaded, clearing')
         files[t] = files[t].rename(columns={'Описание': 'text', 'Код': 'id', 'Финал': 'final'})
         files[t]['Full description'] = files[t]['text']
         files[t] = files[t].apply(clear, axis=1, args=(t,))
+        files[t].to_excel('temp.xlsx')
         log.debug(f'Preparing {t}')
         files[t] = prepare(files[t])
         log.debug(f'{t} prepared')
@@ -238,33 +215,21 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reading test')
-    name = 'постройки'
-    # test_forest = pd.read_excel('input.xlsx', sheet_name=name, usecols=['Описание', 'Финал', 'Код'])
+    name = 'есть_площадь'
+    # test_forest = pd.read_excel('тут_нашлись_постройки_проверить.xlsx', usecols=['Описание', 'Код'])
     test_forest = pd.read_json(f'files/{name}.json', orient='records')
     test_forest = test_forest.iloc[int(0.8 * len(test_forest)):]
     test_forest = test_forest.rename(columns={'Описание': 'text', 'Финал': 'final', 'Код': 'id'})
     test_forest['Full description'] = test_forest['text']
-    for name in ['постройки']:  # files:
+    for name in ['есть_площадь']:  # files:
         log.info(f'Classifying `{name}`')
         data = {"type": name, "data": test_forest.to_dict(orient='records')}
         log.debug('Testing...')
-        result = classify(data['type'], data['data'])
+        result = classify(data['type'], data['data'], data.get('exception'))
         log.debug('Writing...')
         result = pd.read_json(result, orient='records')
         result.to_excel(f'output/{name}_result.xlsx')
 
-# (^|\\s|\\W|\\d)вход
-# (^|\\s|\\W|\\d)вх
-
-# def export_to_json():
-#     for i in ['газоснабжение', 'электричество', 'лесные ресурсы', 'водные ресурсы', 'водоснабжение', 'межевание', 'доступ к участку', 'отдельный вход', 'отделка']:
-#         print(i)
-#         table = pd.read_excel('input.xlsx', sheet_name=i, usecols=['Код', 'Описание', 'Финал'])
-#         table.to_json(f'files/{i}.json', orient='records', force_ascii=False, lines=False)
 
 log.debug('Flask app starts')
-# app.run()
 test_model()
-
-# export_to_json()
-

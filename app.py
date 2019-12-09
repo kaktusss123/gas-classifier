@@ -40,48 +40,24 @@ def clear(row, type_, exception=''):
     try:
         regex = ''
         communications = ''
+        exception = exception or regexes[type_].get('exception')
         descr = row['Full description'].lower().translate(mapping)
         if exception and search(exception, descr, re.IGNORECASE):
             row.at['predicted'] = 'нет данных'
             return row
         regex = regexes[type_]['regex']
         communications = regexes[type_]['communications']
-        sentences = split(r'[.?!;]', row.at['text'].translate(mapping))
+        sentences = split(r'[.?!;]', descr)
         results = []
-        found = False
         for s in sentences:
-            if search(regex, s, flags=re.IGNORECASE):
+            fregex = list(filter(lambda x: x.strip(), map(lambda x: ''.join(x), re.findall(regex, s))))
+            if not fregex:
+                fregex = list(filter(lambda x: x.strip(), map(lambda x: ''.join(x), re.findall(communications, s))))
+            if fregex:
                 results.append(s)
-        if not results:
-            for s in sentences:
-                if search(communications, s, flags=re.IGNORECASE):
-                    results.append(s)
-        # if search(regex, descr, re.IGNORECASE) or search(r'(^|\s|,|\()коммуник', descr, re.IGNORECASE):
-        #     found = True
-        if not results:
+        row.at['text'] = ' '.join(results)
+        if not row.at['text'].strip():
             row.at['predicted'] = 'нет данных'
-            return row
-        else:
-            descr = ' '.join(results)
-            splitted = list(filter(lambda x: x, split(r'([:!?., ])', descr)))
-            new_descr = ''
-            if len(splitted) > 20:
-                for i, e in enumerate(splitted):
-                    if search(regex, e, re.IGNORECASE):
-                        start = max(i - 20, 0)
-                        end = min(i + 21, len(splitted))
-                        new_descr = ' '.join(splitted[start: end])
-                        row.at['text'] = new_descr
-                        return row
-                for i, e in enumerate(splitted):
-                    if search(communications, e, re.IGNORECASE):
-                        start = max(i - 20, 0)
-                        end = min(i + 21, len(splitted))
-                        new_descr = ' '.join(splitted[start: end])
-                        row.at['text'] = new_descr
-                        return row
-
-            row.at['text'] = descr
     except Exception as e:
         print(f'{e.__class__.__name__}: {e}')
     row.at['text'] = str(row.at['text'])
@@ -95,10 +71,6 @@ def new_start():
     for t, f in files.items():
         log.debug(f'Loading `{t}`')
         files[t] = pd.read_json(f'files/{f}', orient='records', encoding='cp1251')
-        ###
-        # if t == 'отделка':
-        #     files[t] = files[t].iloc[int(0.8 * len(f)):]
-        ###
         log.debug(f'{t} loaded, clearing')
         files[t] = files[t].rename(columns={'Описание': 'text', 'Код': 'id', 'Финал': 'final'})
         files[t]['Full description'] = files[t]['text']
