@@ -162,11 +162,11 @@ def new_start():
     log.info('Loading tables')
     with open('config.json', encoding='utf-8') as f:
         files = json.load(f)['files']
-    for t, f in {"есть_площадь": "есть_площадь.json"}.items():  # files.items():
+    for t, f in {"площадь_участка": "площадь_участка.json"}.items():  # files.items():
         log.debug(f'Loading `{t}`')
         files[t] = pd.read_json(f'files/{f}', orient='records')
         ###
-        if t == 'есть_площадь':
+        if t == 'площадь_участка':
             files[t] = files[t].iloc[:int(0.8 * len(files[t]))]
         ###
         log.debug(f'{t} loaded, clearing')
@@ -215,13 +215,13 @@ def classify(type_, data, exception=''):
 
 def test_model():
     log.debug('Reading test')
-    name = 'есть_площадь'
+    name = 'площадь_участка'
     # test_forest = pd.read_excel('тут_нашлись_постройки_проверить.xlsx', usecols=['Описание', 'Код'])
     test_forest = pd.read_json(f'files/{name}.json', orient='records')
     test_forest = test_forest.iloc[int(0.8 * len(test_forest)):]
     test_forest = test_forest.rename(columns={'Описание': 'text', 'Финал': 'final', 'Код': 'id'})
     test_forest['Full description'] = test_forest['text']
-    for name in ['есть_площадь']:  # files:
+    for name in ['площадь_участка']:  # files:
         log.info(f'Classifying `{name}`')
         data = {"type": name, "data": test_forest.to_dict(orient='records')}
         log.debug('Testing...')
